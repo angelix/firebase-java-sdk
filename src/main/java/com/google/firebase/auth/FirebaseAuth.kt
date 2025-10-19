@@ -53,7 +53,7 @@ class UrlFactory(
 }
 
 @Serializable
-class FirebaseUserImpl internal constructor(
+data class FirebaseUserImpl internal constructor(
     @Transient
     private val app: FirebaseApp = FirebaseApp.getInstance(),
     override val isAnonymous: Boolean,
@@ -414,23 +414,13 @@ class FirebaseAuth constructor(
                                     response.body()?.use { it.string() } ?: ""
                                 ).jsonObject
 
-                        user?.let { prev ->
-                            user =
-                                FirebaseUserImpl(
-                                    app = app,
-                                    isAnonymous = prev.isAnonymous,
-                                    uid = prev.uid,
-                                    idToken = prev.idToken,
-                                    refreshToken = prev.refreshToken,
-                                    expiresIn = prev.expiresIn,
-                                    createdAt = newBody["createdAt"]?.jsonPrimitive?.longOrNull ?: prev.createdAt,
-                                    email = newBody["email"]?.jsonPrimitive?.contentOrNull ?: prev.email,
-                                    photoUrl = newBody["photoUrl"]?.jsonPrimitive?.contentOrNull ?: prev.photoUrl,
-                                    displayName = newBody["displayName"]?.jsonPrimitive?.contentOrNull ?: prev.displayName
-                                )
-                            source.setResult(AuthResult { user })
-                        }
-                        source.setResult(null)
+                        user = user?.copy(
+                            createdAt = newBody["createdAt"]?.jsonPrimitive?.longOrNull ?: user!!.createdAt,
+                            email = newBody["email"]?.jsonPrimitive?.contentOrNull ?: user!!.email,
+                            photoUrl = newBody["photoUrl"]?.jsonPrimitive?.contentOrNull ?: user!!.photoUrl,
+                            displayName = newBody["displayName"]?.jsonPrimitive?.contentOrNull ?: user!!.displayName
+                        )
+                        source.setResult(AuthResult { user })
                     }
                 }
             }
