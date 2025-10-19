@@ -369,10 +369,8 @@ class FirebaseAuth constructor(
             setResult = { responseBody ->
                 FirebaseUserImpl(app, jsonParser.parseToJsonElement(responseBody).jsonObject)
             }
-        ).task.continueWith {
-            updateByGetAccountInfo()
-        }
-        return source.result
+        )
+        return source.task.continueWithTask { updateByGetAccountInfo() }
     }
 
     private fun updateByGetAccountInfo(): Task<AuthResult> {
