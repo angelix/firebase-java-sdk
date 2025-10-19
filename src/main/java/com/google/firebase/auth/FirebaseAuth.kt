@@ -7,6 +7,7 @@ import com.google.android.gms.tasks.TaskCompletionSource
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseException
+import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebasePlatform
 import com.google.firebase.auth.internal.InternalAuthProvider
 import com.google.firebase.internal.InternalTokenResult
@@ -551,7 +552,7 @@ class FirebaseAuth constructor(
             .takeUnless { it.task.isComplete }
             ?: enqueueRefreshTokenCall(user)
         refreshSource.task.addOnSuccessListener { source.setResult(map(it)) }
-        refreshSource.task.addOnFailureListener { source.setException(FirebaseException(it.toString(), it)) }
+        refreshSource.task.addOnFailureListener { source.setException(FirebaseNetworkException(it.toString())) }
     }
 
     private fun enqueueRefreshTokenCall(user: FirebaseUserImpl): TaskCompletionSource<FirebaseUserImpl> {
