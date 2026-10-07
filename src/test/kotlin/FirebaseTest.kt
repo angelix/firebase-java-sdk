@@ -45,6 +45,8 @@ abstract class FirebaseTest {
                 override fun log(msg: String) = println(msg)
 
                 override fun getDatabasePath(name: String) = File("./build/$name")
+
+                override fun getFilesDir() = File("./build/files")
             }
         )
     }
