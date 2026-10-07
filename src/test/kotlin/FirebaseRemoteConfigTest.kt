@@ -31,6 +31,19 @@ class FirebaseRemoteConfigTest : FirebaseTest() {
         logs.add(message)
     }
 
+    // On the JVM there is no Android package to fingerprint and no Analytics SDK for A/B testing
+    private val packageNotFound = "FirebaseRemoteConfig No such package: app.teamhub.TeamHub"
+    private val analyticsMissing = "FirebaseRemoteConfig Could not update ABT experiments."
+
+    // Every test fails in tearDown if it logs anything else
+    private val expectedLogs = listOf(
+        "FirebaseApp Device unlocked",
+        packageNotFound,
+        analyticsMissing,
+        // Logged by Installations only when it registers a new installation
+        "ContentValues No such package: app.teamhub.TeamHub"
+    )
+
     private val defaults = mapOf<String, Any>(
         "test_default_boolean" to true,
         "test_default_double" to 42.0,
@@ -43,6 +56,8 @@ class FirebaseRemoteConfigTest : FirebaseTest() {
     @After
     fun tearDown(): Unit = runTest {
         remoteConfig.reset().await()
+
+        assertEquals(emptyList<String>(), logs.toList().filterNot { log -> expectedLogs.any { log.startsWith(it) } })
     }
 
     @Test
@@ -129,18 +144,7 @@ class FirebaseRemoteConfigTest : FirebaseTest() {
 
         assertEquals(FirebaseRemoteConfig.LAST_FETCH_STATUS_SUCCESS, remoteConfig.info.lastFetchStatus)
 
-        // On the JVM there is no Android package to fingerprint and no Analytics SDK for A/B testing
-        val packageNotFound = "FirebaseRemoteConfig No such package: app.teamhub.TeamHub"
-        val analyticsMissing = "FirebaseRemoteConfig Could not update ABT experiments."
-        val expectedLogs = listOf(
-            "FirebaseApp Device unlocked",
-            packageNotFound,
-            analyticsMissing,
-            // Logged by Installations only when it registers a new installation
-            "ContentValues No such package: app.teamhub.TeamHub"
-        )
         val capturedLogs = logs.toList()
-        assertEquals(emptyList<String>(), capturedLogs.filterNot { log -> expectedLogs.any { log.startsWith(it) } })
         assertTrue(capturedLogs.any { it.startsWith(packageNotFound) })
         assertTrue(capturedLogs.any { it.startsWith(analyticsMissing) })
     }
