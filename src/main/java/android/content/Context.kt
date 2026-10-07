@@ -10,6 +10,9 @@ import android.os.PowerManager
 import android.os.UserManager
 import com.google.firebase.FirebasePlatform
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.net.URLEncoder
 
 open class Context {
 
@@ -132,8 +135,26 @@ open class Context {
 
     fun getDatabasePath(name: String): File = FirebasePlatform.firebasePlatform.getDatabasePath(name)
 
+    val filesDir: File
+        get() = FirebasePlatform.firebasePlatform.getFilesDir().apply { mkdirs() }
+
+    fun openFileInput(name: String): FileInputStream = FileInputStream(fileStreamPath(name))
+
+    fun openFileOutput(name: String, mode: Int): FileOutputStream =
+        FileOutputStream(fileStreamPath(name), mode and MODE_APPEND != 0)
+
+    fun deleteFile(name: String): Boolean = fileStreamPath(name).delete()
+
+    // URL-encodes the name so characters such as ':' in Firebase app IDs are valid on every OS
+    private fun fileStreamPath(name: String): File {
+        require('/' !in name && File.separatorChar !in name) { "File $name contains a path separator" }
+        return File(filesDir, URLEncoder.encode(name, Charsets.UTF_8))
+    }
+
     companion object {
         @JvmStatic
         val CONNECTIVITY_SERVICE = "connectivity"
+
+        const val MODE_APPEND = 0x8000
     }
 }

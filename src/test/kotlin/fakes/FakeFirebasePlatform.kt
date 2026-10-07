@@ -9,10 +9,13 @@ import java.io.File
  */
 class FakeFirebasePlatform(
     val storage: MutableMap<String, String> = mutableMapOf(),
-    databaseFolderPath: String = "./build/database/"
+    databaseFolderPath: String = "./build/database/",
+    filesFolderPath: String = "./build/files/"
 ) : FirebasePlatform() {
 
     private val databaseFolder = File(databaseFolderPath)
+
+    private val filesFolder = File(filesFolderPath)
 
     override fun store(key: String, value: String) { storage[key] = value }
 
@@ -23,4 +26,6 @@ class FakeFirebasePlatform(
     override fun log(msg: String) = println(msg)
 
     override fun getDatabasePath(name: String) = File(databaseFolder, name)
+
+    override fun getFilesDir() = filesFolder
 }
