@@ -114,6 +114,13 @@ class FirebaseRemoteConfigTest : FirebaseTest() {
         assertEquals(42L, info.configSettings.minimumFetchIntervalInSeconds)
     }
 
+    @Test
+    fun `fetchAndActivate succeeds`(): Unit = runTest {
+        remoteConfig.fetchAndActivate().await()
+
+        assertEquals(FirebaseRemoteConfig.LAST_FETCH_STATUS_SUCCESS, remoteConfig.info.lastFetchStatus)
+    }
+
     // Unfortunately Firebase Remote Config is not implemented by Firebase emulator so it may be
     // tested against a real project only. Add "test_remote_string": "Hello from remote!" config
     // value in Firebase console for enabling this test case.
