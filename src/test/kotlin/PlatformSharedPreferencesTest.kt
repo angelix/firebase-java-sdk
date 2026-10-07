@@ -103,11 +103,47 @@ class PlatformSharedPreferencesTest {
     }
 
     @Test
+    fun `string sets round-trip`() {
+        val prefs = context.getSharedPreferences("FirebaseHeartBeatW0RFRkFVTFRd", 0)
+        prefs.edit().putStringSet("fire-core/20.4.2", setOf("2026-10-07")).commit()
+
+        assertEquals(setOf("2026-10-07"), prefs.getStringSet("fire-core/20.4.2", null))
+        assertEquals(setOf("default"), prefs.getStringSet("missing", setOf("default")))
+    }
+
+    @Test
+    fun `getAll returns string sets as sets`() {
+        val prefs = context.getSharedPreferences("FirebaseHeartBeatW0RFRkFVTFRd", 0)
+        prefs.edit()
+            .putString("last-used-date", "2026-10-07")
+            .putStringSet("fire-core/20.4.2", setOf("2026-10-06", "2026-10-07"))
+            .commit()
+
+        assertEquals(
+            mapOf("last-used-date" to "2026-10-07", "fire-core/20.4.2" to setOf("2026-10-06", "2026-10-07")),
+            prefs.all
+        )
+    }
+
+    @Test
+    fun `remove deletes the key`() {
+        val prefs = context.getSharedPreferences("FirebaseHeartBeatW0RFRkFVTFRd", 0)
+        prefs.edit().putStringSet("fire-core/20.4.2", setOf("2026-10-07")).commit()
+        prefs.edit().remove("fire-core/20.4.2").commit()
+
+        assertFalse(prefs.contains("fire-core/20.4.2"))
+        assertTrue(prefs.all.isEmpty())
+    }
+
+    @Test
     fun `other preference files still reject unknown keys`() {
-        val prefs = context.getSharedPreferences("FirebaseHeartBeat", 0)
+        val prefs = context.getSharedPreferences("com.google.firebase.common.prefs:W0RFRkFVTFRd", 0)
 
         assertThrows(IllegalArgumentException::class.java) { prefs.getInt("unknown", 0) }
         assertThrows(IllegalArgumentException::class.java) { prefs.edit().putInt("unknown", 0) }
         assertThrows(IllegalArgumentException::class.java) { prefs.edit().clear() }
+        assertThrows(IllegalArgumentException::class.java) { prefs.getStringSet("unknown", null) }
+        assertThrows(IllegalArgumentException::class.java) { prefs.edit().putStringSet("unknown", null) }
+        assertThrows(IllegalArgumentException::class.java) { prefs.edit().remove("unknown") }
     }
 }

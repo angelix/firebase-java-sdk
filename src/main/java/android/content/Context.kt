@@ -46,7 +46,7 @@ open class Context {
     val applicationInfo: ApplicationInfo = ApplicationInfo()
 
     fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
-        if (name.startsWith("frc_") || name == "com.google.android.gms.appid") {
+        if (name.startsWith("frc_") || name == "com.google.android.gms.appid" || name.startsWith("FirebaseHeartBeat")) {
             return PlatformSharedPreferences(name)
         }
         return object : SharedPreferences {
@@ -82,6 +82,10 @@ open class Context {
                 throw IllegalArgumentException(key)
             }
 
+            override fun getStringSet(key: String?, defaultValues: Set<String>?): Set<String>? {
+                throw IllegalArgumentException(key)
+            }
+
             override fun getAll(): Map<String, String> {
                 return emptyMap()
             }
@@ -109,6 +113,14 @@ open class Context {
                     }
 
                     override fun putInt(key: String?, value: Int): Editor {
+                        throw IllegalArgumentException(key)
+                    }
+
+                    override fun putStringSet(key: String?, values: Set<String>?): Editor {
+                        throw IllegalArgumentException(key)
+                    }
+
+                    override fun remove(key: String?): Editor {
                         throw IllegalArgumentException(key)
                     }
 

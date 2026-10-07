@@ -1,12 +1,14 @@
 /*
  * SharedPreferences persisted through FirebasePlatform, returned by Context.getSharedPreferences
- * for the preference files of Remote Config and Installations. Each key is stored as
- * "<file>|<key>", and the file's key set is stored under "<file>|__keys" so clear() can find them.
- * Puts are written immediately, so commit() and apply() have nothing left to do.
+ * for the preference files of Remote Config, Installations, and Firebase heartbeats. Each key is
+ * stored as "<file>|<key>", with string sets JSON-encoded. An index under "<file>|__keys" maps each
+ * key to whether its value is a string set, so getAll() can restore the type and clear() can find
+ * every key. Puts are written immediately, so commit() and apply() have nothing left to do.
  */
 package android.content
 
 import com.google.firebase.FirebasePlatform
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -24,8 +26,15 @@ internal class PlatformSharedPreferences(private val name: String) : SharedPrefe
 
     override fun getInt(key: String, defValue: Int): Int = platform.retrieve(storageKey(key))?.toInt() ?: defValue
 
-    override fun getAll(): Map<String, String> = synchronized(lock) {
-        keys().mapNotNull { key -> platform.retrieve(storageKey(key))?.let { key to it } }.toMap()
+    override fun getStringSet(key: String, defValues: Set<String>?): Set<String>? =
+        platform.retrieve(storageKey(key))?.let { Json.decodeFromString(stringSetSerializer, it) } ?: defValues
+
+    override fun getAll(): Map<String, Any> = synchronized(lock) {
+        index().mapNotNull { (key, isStringSet) ->
+            platform.retrieve(storageKey(key))?.let { value ->
+                key to if (isStringSet) Json.decodeFromString(stringSetSerializer, value) else value
+            }
+        }.toMap()
     }
 
     override fun edit(): SharedPreferences.Editor = object : SharedPreferences.Editor {
@@ -44,6 +53,16 @@ internal class PlatformSharedPreferences(private val name: String) : SharedPrefe
             return this
         }
 
+        override fun putStringSet(key: String, values: Set<String>?): SharedPreferences.Editor {
+            put(key, values?.let { Json.encodeToString(stringSetSerializer, it) }, isStringSet = true)
+            return this
+        }
+
+        override fun remove(key: String): SharedPreferences.Editor {
+            put(key, null)
+            return this
+        }
+
         override fun clear(): SharedPreferences.Editor {
             clearAll()
             return this
@@ -55,32 +74,33 @@ internal class PlatformSharedPreferences(private val name: String) : SharedPrefe
         }
     }
 
-    private fun put(key: String, value: String?) = synchronized(lock) {
+    private fun put(key: String, value: String?, isStringSet: Boolean = false) = synchronized(lock) {
         if (value == null) {
             platform.clear(storageKey(key))
-            writeKeys(keys() - key)
+            writeIndex(index() - key)
         } else {
             platform.store(storageKey(key), value)
-            writeKeys(keys() + key)
+            writeIndex(index() + (key to isStringSet))
         }
     }
 
     private fun clearAll() = synchronized(lock) {
-        keys().forEach { platform.clear(storageKey(it)) }
-        platform.clear(keysKey)
+        index().keys.forEach { platform.clear(storageKey(it)) }
+        platform.clear(indexKey)
     }
 
-    private fun keys(): Set<String> = platform.retrieve(keysKey)?.let { Json.decodeFromString(keySetSerializer, it) } ?: emptySet()
+    private fun index(): Map<String, Boolean> = platform.retrieve(indexKey)?.let { Json.decodeFromString(indexSerializer, it) } ?: emptyMap()
 
-    private fun writeKeys(keys: Set<String>) = platform.store(keysKey, Json.encodeToString(keySetSerializer, keys))
+    private fun writeIndex(index: Map<String, Boolean>) = platform.store(indexKey, Json.encodeToString(indexSerializer, index))
 
     private fun storageKey(key: String) = "$name|$key"
 
-    private val keysKey: String
+    private val indexKey: String
         get() = "$name|__keys"
 
     companion object {
         private val lock = Any()
-        private val keySetSerializer = SetSerializer(String.serializer())
+        private val stringSetSerializer = SetSerializer(String.serializer())
+        private val indexSerializer = MapSerializer(String.serializer(), Boolean.serializer())
     }
 }
