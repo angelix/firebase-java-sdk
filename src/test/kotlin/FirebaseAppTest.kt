@@ -4,6 +4,7 @@ import com.google.firebase.FirebaseOptions
 import com.google.firebase.FirebasePlatform
 import com.google.firebase.initialize
 import org.junit.Test
+import java.io.File
 
 class FirebaseAppTest : FirebaseTest() {
     @Test
@@ -24,6 +25,11 @@ class FirebaseAppTest : FirebaseTest() {
                 }
 
                 override fun log(msg: String) = println(msg)
+
+                // Keeps Firebase's data in this test's temporary folder
+                override fun getDatabasePath(name: String) = File(folder.root, name)
+
+                override fun getFilesDir() = File(folder.root, "files")
             }
         )
         val options =

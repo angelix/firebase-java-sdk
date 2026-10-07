@@ -89,6 +89,15 @@ class ContextFilesTest {
     }
 
     @Test
+    fun `getDatabasePath creates its folder`() {
+        val databases = File(folder.root, "databases")
+        FirebasePlatform.initializeFirebasePlatform(FakeFirebasePlatform(databaseFolderPath = databases.path))
+
+        assertEquals(File(databases, "firestore.db"), context.getDatabasePath("firestore.db"))
+        assertTrue(databases.isDirectory)
+    }
+
+    @Test
     fun `any preferences name is accepted`() {
         val prefs = context.getSharedPreferences("com.google.firebase.common.prefs:W0RFRkFVTFRd", 0)
 

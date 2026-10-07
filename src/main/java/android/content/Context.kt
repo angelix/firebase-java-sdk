@@ -66,7 +66,9 @@ open class Context {
         return File(System.getProperty("java.io.tmpdir"))
     }
 
-    fun getDatabasePath(name: String): File = FirebasePlatform.firebasePlatform.getDatabasePath(name)
+    // Creates the folder, because the SQLite driver cannot create a database in a missing folder
+    fun getDatabasePath(name: String): File =
+        FirebasePlatform.firebasePlatform.getDatabasePath(name).apply { parentFile?.mkdirs() }
 
     val filesDir: File
         get() = FirebasePlatform.firebasePlatform.getFilesDir().apply { mkdirs() }
