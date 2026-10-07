@@ -17,10 +17,19 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Ignore
 import org.junit.Test
+import java.util.Collections
 
 class FirebaseRemoteConfigTest : FirebaseTest() {
+
+    // Firebase logs from background threads, so the list is synchronized
+    private val logs: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+    override fun log(message: String) {
+        logs.add(message)
+    }
 
     private val defaults = mapOf<String, Any>(
         "test_default_boolean" to true,
@@ -119,6 +128,21 @@ class FirebaseRemoteConfigTest : FirebaseTest() {
         remoteConfig.fetchAndActivate().await()
 
         assertEquals(FirebaseRemoteConfig.LAST_FETCH_STATUS_SUCCESS, remoteConfig.info.lastFetchStatus)
+
+        // On the JVM there is no Android package to fingerprint and no Analytics SDK for A/B testing
+        val packageNotFound = "FirebaseRemoteConfig No such package: app.teamhub.TeamHub"
+        val analyticsMissing = "FirebaseRemoteConfig Could not update ABT experiments."
+        val expectedLogs = listOf(
+            "FirebaseApp Device unlocked",
+            packageNotFound,
+            analyticsMissing,
+            // Logged by Installations only when it registers a new installation
+            "ContentValues No such package: app.teamhub.TeamHub"
+        )
+        val capturedLogs = logs.toList()
+        assertEquals(emptyList<String>(), capturedLogs.filterNot { log -> expectedLogs.any { log.startsWith(it) } })
+        assertTrue(capturedLogs.any { it.startsWith(packageNotFound) })
+        assertTrue(capturedLogs.any { it.startsWith(analyticsMissing) })
     }
 
     // Unfortunately Firebase Remote Config is not implemented by Firebase emulator so it may be

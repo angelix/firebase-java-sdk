@@ -25,6 +25,8 @@ abstract class FirebaseTest {
         Firebase.initialize(Application(), options)
     }
 
+    protected open fun log(message: String) = println(message)
+
     @Before
     fun beforeEach() {
         FirebasePlatform.initializeFirebasePlatform(
@@ -42,7 +44,7 @@ abstract class FirebaseTest {
                     storage.remove(key)
                 }
 
-                override fun log(msg: String) = println(msg)
+                override fun log(msg: String) = this@FirebaseTest.log(msg)
 
                 override fun getDatabasePath(name: String) = File("./build/$name")
 
