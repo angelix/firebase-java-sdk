@@ -1,6 +1,6 @@
 /*
  * Tests that Firebase's heartbeat reporting (firebase-common), which Installations attaches to
- * its requests, can store and read heartbeats through the platform-backed preferences.
+ * its requests, can store and read heartbeats through the file-backed preferences.
  */
 import com.google.firebase.heartbeatinfo.DefaultHeartBeatController
 import kotlinx.coroutines.tasks.await
