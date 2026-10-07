@@ -70,13 +70,14 @@ internal class PreferencesFile private constructor(private val file: File) : Sha
         synchronized(this) {
             val updated = if (clear) mutableMapOf() else values().toMutableMap()
             changes.forEach { (key, value) -> if (value == null) updated.remove(key) else updated[key] = value }
+            // As on Android, memory is updated first, so the new values stay readable if the write fails
+            loadedValues = updated
             try {
                 write(updated)
             } catch (e: IOException) {
                 Log.e(TAG, "Failed to write preferences file $file", e)
                 return false
             }
-            loadedValues = updated
             return true
         }
     }

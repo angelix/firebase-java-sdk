@@ -164,14 +164,15 @@ class PreferencesFileTest {
     }
 
     @Test
-    fun `failed commit keeps previous values and returns false`() {
+    fun `failed commit keeps the new values in memory and returns false`() {
         val prefs = prefs()
         prefs.edit().putString("key", "before").commit()
         val sharedPrefs = file("frc_app_firebase_settings").parentFile
         sharedPrefs.setWritable(false)
         try {
             assertFalse(prefs.edit().putString("key", "after").commit())
-            assertEquals("before", prefs.getString("key", null))
+            // As on Android, memory is updated even when the file cannot be written
+            assertEquals("after", prefs.getString("key", null))
             assertTrue(platform.logs.any { it.startsWith("PreferencesFile Failed to write preferences file") })
         } finally {
             sharedPrefs.setWritable(true)
