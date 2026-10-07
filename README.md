@@ -47,11 +47,16 @@ Before you can use the SDK you need to call the `FirebasePlatform.initializeFire
 logging, and persistent storage for simple key value pairs. This is used by the various Firebase products, for example, to persist the 
 signed-in user in Firebase Auth.
 
+The Firebase products call these methods from background threads, so your implementation must be thread-safe. The keys are
+arbitrary strings that can be several hundred characters long and contain characters such as spaces, `/`, `|` and `:`, so a
+storage backend with restrictions on keys (for example a file per key, or `java.util.prefs.Preferences`) needs to map them first,
+for example by hashing them.
+
 Here's a simple example implementation in Kotlin that only persists in-memory:
 
 ```kotlin
 FirebasePlatform.initializeFirebasePlatform(object : FirebasePlatform() {
-    val storage = mutableMapOf<String, String>()
+    val storage = ConcurrentHashMap<String, String>()
     override fun store(key: String, value: String) = storage.set(key, value)
     override fun retrieve(key: String) = storage[key]
     override fun clear(key: String) { storage.remove(key) }
