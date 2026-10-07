@@ -1,4 +1,5 @@
 import android.net.Uri
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
 import com.google.firebase.storage.internal.Slashes
 import com.google.firebase.storage.storage
@@ -41,6 +42,6 @@ class FirebaseStorageTest : FirebaseTest() {
 
         Assert.assertNotNull(downloadUrl)
         // Waits for the request so its logs stay within this test; the outcome is not under test
-        runCatching { downloadUrl.await() }
+        Tasks.whenAllComplete(downloadUrl).await()
     }
 }

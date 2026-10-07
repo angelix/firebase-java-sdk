@@ -12,6 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -31,6 +32,11 @@ class PreferencesFileTest {
     private fun file(name: String) = File(folder.root, "shared_prefs/$name.json")
 
     private fun prefs(name: String = "frc_app_firebase_settings") = PreferencesFile.at(file(name))
+
+    private fun canCreateFileIn(folder: File): Boolean {
+        val probe = File(folder, "probe")
+        return runCatching { probe.createNewFile() }.getOrDefault(false).also { created -> if (created) probe.delete() }
+    }
 
     @Before
     fun setUp() {
@@ -180,6 +186,8 @@ class PreferencesFileTest {
         val sharedPrefs = file("frc_app_firebase_settings").parentFile
         sharedPrefs.setWritable(false)
         try {
+            // Root, and Windows, can still create files in a folder marked read-only
+            assumeFalse("folder is still writable", canCreateFileIn(sharedPrefs))
             assertFalse(prefs.edit().putString("key", "after").commit())
             // As on Android, memory is updated even when the file cannot be written
             assertEquals("after", prefs.getString("key", null))
