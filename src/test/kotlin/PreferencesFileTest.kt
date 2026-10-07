@@ -143,6 +143,16 @@ class PreferencesFileTest {
     }
 
     @Test
+    fun `commits that change nothing do not write the file`() {
+        val prefs = prefs("unchanged")
+
+        assertTrue(prefs.edit().commit())
+        assertTrue(prefs.edit().clear().remove("missing").commit())
+
+        assertFalse(file("unchanged").exists())
+    }
+
+    @Test
     fun `missing file reads as empty`() {
         val prefs = prefs("absent")
 

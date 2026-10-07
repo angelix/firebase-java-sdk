@@ -22,6 +22,7 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -70,6 +71,7 @@ internal class PreferencesFile private constructor(private val file: File) : Sha
         synchronized(this) {
             val updated = if (clear) mutableMapOf() else values().toMutableMap()
             changes.forEach { (key, value) -> if (value == null) updated.remove(key) else updated[key] = value }
+            if (updated == values()) return true
             // As on Android, memory is updated first, so the new values stay readable if the write fails
             loadedValues = updated
             try {
@@ -82,14 +84,18 @@ internal class PreferencesFile private constructor(private val file: File) : Sha
         }
     }
 
-    // Writes a temporary file and moves it over the target, so a failed write leaves the previous file intact
+    // Writes a temporary file and moves it over the target, so a failed write leaves the previous file intact.
+    // The temporary file is synced to disk first, so a power loss cannot leave an empty file behind.
     private fun write(values: Map<String, Any>) {
         val folder = file.parentFile
         // Succeeds when another file's write has just created the folder
         Files.createDirectories(folder.toPath())
         val temporary = File.createTempFile(file.name, ".tmp", folder)
         try {
-            temporary.writeText(JsonObject(values.mapValues { (_, value) -> encode(value) }).toString())
+            FileOutputStream(temporary).use { output ->
+                output.write(JsonObject(values.mapValues { (_, value) -> encode(value) }).toString().toByteArray())
+                output.fd.sync()
+            }
             Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } finally {
             temporary.delete()
