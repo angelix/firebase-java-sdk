@@ -1,4 +1,9 @@
 /*
+ * Ported unchanged from AOSP (android14-release). Thrown by the android.util.Base64OutputStream
+ * shim, which firebase-common uses to encode heartbeat headers.
+ */
+
+/*
  * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");

@@ -47,10 +47,8 @@ Before you can use the SDK you need to call the `FirebasePlatform.initializeFire
 logging, and persistent storage for simple key value pairs. This is used by the various Firebase products, for example, to persist the 
 signed-in user in Firebase Auth.
 
-The Firebase products call these methods from background threads, so your implementation must be thread-safe. The keys are
-arbitrary strings that can be several hundred characters long and contain characters such as spaces, `/`, `|` and `:`, so a
-storage backend with restrictions on keys (for example a file per key, or `java.util.prefs.Preferences`) needs to map them first,
-for example by hashing them.
+Firebase Auth calls these methods from background threads, so your implementation must be thread-safe. The other Firebase
+products keep their state in files under `getFilesDir()`, described below.
 
 Here's a simple example implementation in Kotlin that only persists in-memory:
 
@@ -82,7 +80,8 @@ The `FirebasePlatform` interface also includes a `getFilesDir` method for you to
     open fun getFilesDir(): File = File("${System.getProperty("java.io.tmpdir")}${File.separatorChar}firebase-files")
 ```
 
-This is used by Remote Config and Installations to persist fetched configs and the installation ID.
+This is used by Remote Config and Installations to persist fetched configs and the installation ID, and by all Firebase
+products to store their preferences, as JSON files in a `shared_prefs` subfolder.
 
 #### Initialize the Firebase application
 

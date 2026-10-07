@@ -1,4 +1,9 @@
 /*
+ * Ported unchanged from AOSP (android14-release). Firebase Installations parses its REST
+ * responses with android.util.JsonReader.
+ */
+
+/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
