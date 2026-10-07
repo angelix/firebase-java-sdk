@@ -69,6 +69,16 @@ The `FirebasePlatform` interface also includes a `getDatabasePath` method for yo
 
 This is used by Firestore to support [offline data persistence](https://firebase.google.com/docs/firestore/manage-data/enable-offline).
 
+#### Customizing file storage location
+
+The `FirebasePlatform` interface also includes a `getFilesDir` method for you to override if the following default implementation is not suitable:
+
+```kotlin
+    open fun getFilesDir(): File = File("${System.getProperty("java.io.tmpdir")}${File.separatorChar}firebase-files")
+```
+
+This is used by Remote Config and Installations to persist fetched configs and the installation ID.
+
 #### Initialize the Firebase application
 
 It is also up to you to initialize the Firebase application object manually (unlike the Android SDK which is normally initialized via 
@@ -111,11 +121,11 @@ The following libraries are available for the various Firebase products.
 | [Cloud Firestore](https://firebase.google.com/docs/firestore)                                     | `24.10.0`               |
 | [Realtime Database](https://firebase.google.com/docs/database)                                    | `20.3.0`                |
 | [Cloud Functions](https://firebase.google.com/docs/functions)                                     | `20.4.0`                |
-| ~[Remote Config](https://firebase.google.com/docs/remote-config)~                                 | `21.6.0`[^2]            |
-| ~[Installations](https://firebase.google.com/docs/projects/manage-installations)~                 | `17.2.0`[^2]            |
+| [Remote Config](https://firebase.google.com/docs/remote-config)                                   | `21.6.0`[^2]            |
+| [Installations](https://firebase.google.com/docs/projects/manage-installations)                   | `17.2.0`                |
 
 [^1]: Google has not open-sourced the Firebase Auth implementation for Android so a basic implementation using the Rest API is provided.
-[^2]: Although the libraries are inlcuded they are currently not funtional 
+[^2]: Realtime updates (`addOnConfigUpdateListener`) and defaults from XML resources are not supported.
 
 Is the Firebase library or API you need missing? [Create an issue](https://github.com/GitLiveApp/firebase-java-sdk/issues/new?labels=API+coverage&template=increase-api-coverage.md&title=Add+%5Bclass+name%5D.%5Bfunction+name%5D+to+%5Blibrary+name) to request additional API coverage or be awesome and [submit a PR](https://github.com/GitLiveApp/firebase-java-sdk/fork).
 
