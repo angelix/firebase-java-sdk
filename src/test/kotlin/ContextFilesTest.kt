@@ -77,4 +77,21 @@ class ContextFilesTest {
     fun `file names with path separators are rejected`() {
         assertThrows(IllegalArgumentException::class.java) { context.openFileOutput("../escape.json", 0) }
     }
+
+    @Test
+    fun `preferences are stored as files in filesDir`() {
+        context.getSharedPreferences("frc_1:341458593155:web:bf8e1aa37efe01f32d42b6_firebase_settings", 0)
+            .edit().putLong("last_fetch_time_in_millis", 1L).commit()
+
+        val stored = File(filesDir, "shared_prefs").list()!!.single()
+        assertTrue(stored.endsWith(".json"))
+        assertTrue(':' !in stored)
+    }
+
+    @Test
+    fun `any preferences name is accepted`() {
+        val prefs = context.getSharedPreferences("com.google.firebase.common.prefs:W0RFRkFVTFRd", 0)
+
+        assertTrue(prefs.getBoolean("firebase_data_collection_default_enabled", true))
+    }
 }

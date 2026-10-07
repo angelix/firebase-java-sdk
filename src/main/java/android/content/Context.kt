@@ -1,6 +1,5 @@
 package android.content
 
-import android.content.SharedPreferences.Editor
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.res.Resources
@@ -45,101 +44,8 @@ open class Context {
 
     val applicationInfo: ApplicationInfo = ApplicationInfo()
 
-    fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
-        if (name.startsWith("frc_") || name == "com.google.android.gms.appid" || name.startsWith("FirebaseHeartBeat")) {
-            return PlatformSharedPreferences(name)
-        }
-        return object : SharedPreferences {
-            override fun contains(key: String): Boolean {
-                when (key) {
-                    "firebase_data_collection_default_enabled" -> return false
-                    "auto_init" -> return false
-                    "firebase_messaging_auto_init_enabled" -> return false
-                    "fire-fst" -> return false
-                    "fire-global" -> return !FirebasePlatform.firebasePlatform.retrieve(key).isNullOrEmpty()
-                }
-                throw IllegalArgumentException(key)
-            }
-
-            override fun getString(key: String, defaultValue: String?): String? {
-                return when {
-                    key == "last-used-date" -> FirebasePlatform.firebasePlatform.retrieve(key) ?: defaultValue
-                    key.contains("|T|") -> null
-                    key.startsWith("com.google.firebase.auth.FIREBASE_USER") ->
-                        FirebasePlatform.firebasePlatform.retrieve(key) ?: defaultValue
-                    else -> throw IllegalArgumentException(key)
-                }
-            }
-
-            override fun getLong(key: String?, defaultValue: Long): Long {
-                when (key) {
-                    "fire-global" -> return FirebasePlatform.firebasePlatform.retrieve(key)?.toLong() ?: defaultValue
-                }
-                throw IllegalArgumentException(key)
-            }
-
-            override fun getInt(key: String?, defaultValue: Int): Int {
-                throw IllegalArgumentException(key)
-            }
-
-            override fun getStringSet(key: String?, defaultValues: Set<String>?): Set<String>? {
-                throw IllegalArgumentException(key)
-            }
-
-            override fun getAll(): Map<String, String> {
-                return emptyMap()
-            }
-
-            override fun edit(): Editor {
-                return object : Editor {
-                    override fun putLong(key: String?, value: Long): Editor {
-                        when (key) {
-                            "fire-global" -> FirebasePlatform.firebasePlatform.store(key, value.toString())
-                            else -> throw IllegalArgumentException(key)
-                        }
-                        return this
-                    }
-
-                    override fun putString(key: String?, value: String?): Editor {
-                        when (key) {
-                            "last-used-date" -> FirebasePlatform.firebasePlatform.store(key, value.toString())
-                            else -> if (key?.startsWith("com.google.firebase.auth.FIREBASE_USER") == true) {
-                                FirebasePlatform.firebasePlatform.store(key, value.toString())
-                            } else {
-                                throw IllegalArgumentException(key)
-                            }
-                        }
-                        return this
-                    }
-
-                    override fun putInt(key: String?, value: Int): Editor {
-                        throw IllegalArgumentException(key)
-                    }
-
-                    override fun putStringSet(key: String?, values: Set<String>?): Editor {
-                        throw IllegalArgumentException(key)
-                    }
-
-                    override fun remove(key: String?): Editor {
-                        throw IllegalArgumentException(key)
-                    }
-
-                    override fun clear(): Editor {
-                        throw IllegalArgumentException(name)
-                    }
-
-                    override fun commit(): Boolean {
-                        // Don't need to commit as changes are committed in the put method
-                        return true
-                    }
-
-                    override fun apply() {
-                        // Don't need to apply as changes are applied in the put method
-                    }
-                }
-            }
-        }
-    }
+    fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
+        PreferencesFile.at(File(File(filesDir, "shared_prefs"), "${encodeFileName(name)}.json"))
 
     fun getSystemService(name: String): Any {
         when (name) {
@@ -172,11 +78,13 @@ open class Context {
 
     fun deleteFile(name: String): Boolean = fileStreamPath(name).delete()
 
-    // URL-encodes the name so characters such as ':' in Firebase app IDs are valid on every OS
     private fun fileStreamPath(name: String): File {
         require('/' !in name && File.separatorChar !in name) { "File $name contains a path separator" }
-        return File(filesDir, URLEncoder.encode(name, Charsets.UTF_8))
+        return File(filesDir, encodeFileName(name))
     }
+
+    // URL-encodes the name so characters such as ':' in Firebase app IDs are valid on every OS
+    private fun encodeFileName(name: String): String = URLEncoder.encode(name, Charsets.UTF_8)
 
     companion object {
         @JvmStatic

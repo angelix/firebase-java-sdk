@@ -1,0 +1,225 @@
+/*
+ * Tests for PreferencesFile, the SharedPreferences that stores each preferences name as a JSON
+ * file under FirebasePlatform.getFilesDir()/shared_prefs.
+ */
+import android.content.PreferencesFile
+import com.google.firebase.FirebasePlatform
+import fakes.FakeFirebasePlatform
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
+
+class PreferencesFileTest {
+
+    @get:Rule
+    val folder = TemporaryFolder()
+
+    private val platform = FakeFirebasePlatform()
+
+    private fun file(name: String) = File(folder.root, "shared_prefs/$name.json")
+
+    private fun prefs(name: String = "frc_app_firebase_settings") = PreferencesFile.at(file(name))
+
+    @Before
+    fun setUp() {
+        FirebasePlatform.initializeFirebasePlatform(platform)
+    }
+
+    @Test
+    fun `values round-trip with their types`() {
+        val prefs = prefs()
+        prefs.edit()
+            .putString("string", "abc")
+            .putInt("int", -1)
+            .putLong("long", 42L)
+            .putBoolean("boolean", true)
+            .putStringSet("stringSet", setOf("x", "y"))
+            .commit()
+
+        assertEquals("abc", prefs.getString("string", null))
+        assertEquals(-1, prefs.getInt("int", 0))
+        assertEquals(42L, prefs.getLong("long", 0L))
+        assertTrue(prefs.getBoolean("boolean", false))
+        assertEquals(setOf("x", "y"), prefs.getStringSet("stringSet", null))
+        assertEquals(
+            mapOf("string" to "abc", "int" to -1, "long" to 42L, "boolean" to true, "stringSet" to setOf("x", "y")),
+            prefs.all
+        )
+    }
+
+    @Test
+    fun `missing keys return defaults`() {
+        val prefs = prefs()
+
+        assertEquals("default", prefs.getString("missing", "default"))
+        assertEquals(7, prefs.getInt("missing", 7))
+        assertEquals(7L, prefs.getLong("missing", 7L))
+        assertTrue(prefs.getBoolean("missing", true))
+        assertEquals(setOf("default"), prefs.getStringSet("missing", setOf("default")))
+        assertFalse(prefs.contains("missing"))
+    }
+
+    @Test
+    fun `remove and putString null delete the key`() {
+        val prefs = prefs()
+        prefs.edit().putString("first", "a").putString("second", "b").commit()
+
+        prefs.edit().remove("first").putString("second", null).commit()
+
+        assertTrue(prefs.all.isEmpty())
+    }
+
+    @Test
+    fun `files do not see each other's keys`() {
+        prefs("first").edit().putString("key", "first").commit()
+
+        assertNull(prefs("second").getString("key", null))
+    }
+
+    @Test
+    fun `clear affects only its own file`() {
+        prefs("first").edit().putString("key", "first").commit()
+        prefs("second").edit().putString("key", "second").commit()
+
+        prefs("first").edit().clear().commit()
+
+        assertTrue(prefs("first").all.isEmpty())
+        assertEquals("second", prefs("second").getString("key", null))
+    }
+
+    @Test
+    fun `clear applies before the edits it is batched with`() {
+        val prefs = prefs()
+        prefs.edit().putString("old", "value").commit()
+
+        prefs.edit().putString("kept", "value").clear().commit()
+
+        assertEquals(mapOf("kept" to "value"), prefs.all)
+    }
+
+    @Test
+    fun `edits are not visible before commit`() {
+        val prefs = prefs()
+        val edit = prefs.edit().putString("key", "value")
+
+        assertFalse(prefs.contains("key"))
+        edit.commit()
+        assertTrue(prefs.contains("key"))
+    }
+
+    @Test
+    fun `commit writes json and leaves no temporary files`() {
+        prefs().edit().putInt("num_failed_fetches", 3).commit()
+
+        val stored = Json.parseToJsonElement(file("frc_app_firebase_settings").readText()).jsonObject
+        assertEquals(setOf("num_failed_fetches"), stored.keys)
+        assertEquals(listOf("frc_app_firebase_settings.json"), file("frc_app_firebase_settings").parentFile.list()!!.toList())
+    }
+
+    @Test
+    fun `existing file is loaded when first opened`() {
+        file("restored").parentFile.mkdirs()
+        file("restored").writeText(
+            """{"num_failed_fetches":{"int":3},"last_fetch_time_in_millis":{"long":42},"fire-core":{"stringSet":["2026-10-08"]}}"""
+        )
+
+        val prefs = prefs("restored")
+
+        assertEquals(3, prefs.getInt("num_failed_fetches", 0))
+        assertEquals(42L, prefs.getLong("last_fetch_time_in_millis", 0L))
+        assertEquals(setOf("2026-10-08"), prefs.getStringSet("fire-core", null))
+    }
+
+    @Test
+    fun `missing file reads as empty`() {
+        val prefs = prefs("absent")
+
+        assertTrue(prefs.all.isEmpty())
+        assertFalse(file("absent").exists())
+    }
+
+    @Test
+    fun `corrupt file is logged, read as empty and overwritten`() {
+        file("corrupt").parentFile.mkdirs()
+        file("corrupt").writeText("not json")
+
+        val prefs = prefs("corrupt")
+
+        assertTrue(prefs.all.isEmpty())
+        assertTrue(platform.logs.any { it.startsWith("PreferencesFile Ignoring unreadable preferences file") })
+        prefs.edit().putString("key", "value").commit()
+        assertEquals(setOf("key"), Json.parseToJsonElement(file("corrupt").readText()).jsonObject.keys)
+    }
+
+    @Test
+    fun `failed commit keeps previous values and returns false`() {
+        val prefs = prefs()
+        prefs.edit().putString("key", "before").commit()
+        val sharedPrefs = file("frc_app_firebase_settings").parentFile
+        sharedPrefs.setWritable(false)
+        try {
+            assertFalse(prefs.edit().putString("key", "after").commit())
+            assertEquals("before", prefs.getString("key", null))
+            assertTrue(platform.logs.any { it.startsWith("PreferencesFile Failed to write preferences file") })
+        } finally {
+            sharedPrefs.setWritable(true)
+        }
+    }
+
+    @Test
+    fun `concurrent commits all land in the file`() {
+        val prefs = prefs()
+        (0 until 8).map { i ->
+            thread { repeat(50) { j -> prefs.edit().putInt("key-$i-$j", j).commit() } }
+        }.forEach { it.join() }
+
+        assertEquals(400, prefs.all.size)
+        assertEquals(400, Json.parseToJsonElement(file("frc_app_firebase_settings").readText()).jsonObject.size)
+    }
+
+    @Test
+    fun `files first written concurrently in a new folder are all saved`() {
+        repeat(20) { round ->
+            val start = CountDownLatch(1)
+            val results = Collections.synchronizedList(mutableListOf<Boolean>())
+            (0 until 8).map { i ->
+                val prefs = PreferencesFile.at(File(folder.root, "round-$round/shared_prefs/file-$i.json"))
+                thread {
+                    start.await()
+                    results.add(prefs.edit().putInt("key", i).commit())
+                }
+            }.also { start.countDown() }.forEach { it.join() }
+
+            assertEquals(List(8) { true }, results.toList())
+        }
+    }
+
+    @Test
+    fun `changing a returned string set does not change the stored value`() {
+        val prefs = prefs()
+        prefs.edit().putStringSet("dates", setOf("2026-10-08")).commit()
+
+        (prefs.getStringSet("dates", null) as MutableSet<String>).add("2026-10-09")
+        @Suppress("UNCHECKED_CAST")
+        (prefs.all["dates"] as MutableSet<String>).add("2026-10-10")
+
+        assertEquals(setOf("2026-10-08"), prefs.getStringSet("dates", null))
+    }
+
+    @Test
+    fun `same path returns the same instance`() {
+        assertSame(prefs("shared"), prefs("shared"))
+    }
+}
