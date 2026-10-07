@@ -1018,3 +1018,158 @@ Expected: no exceptions or warnings from Remote Config, Installations, or the sh
 git add README.md
 git commit -m "Document Remote Config and Installations support"
 ```
+
+---
+
+### Task 7: Platform-backed heartbeat preferences
+
+Added during execution (spec: "Changes agreed during implementation", item 1). Runs before Task 6.
+
+**Files:**
+- Modify: `src/main/java/android/content/SharedPreferences.java`
+- Modify: `src/main/java/android/content/PlatformSharedPreferences.kt`
+- Modify: `src/main/java/android/content/Context.kt`
+- Test: `src/test/kotlin/PlatformSharedPreferencesTest.kt`, `src/test/kotlin/HeartBeatTest.kt` (create)
+
+**Interfaces:**
+- Produces: `Map<String, ?> getAll()`; `Set<String> getStringSet(String, Set<String>)`; `Editor putStringSet(String, Set<String>)`; `Editor remove(String)`. `Context.getSharedPreferences` returns `PlatformSharedPreferences` for names starting with `FirebaseHeartBeat`. Key index `"<name>|__keys"` becomes a JSON object mapping each key to whether its value is a string set.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `PlatformSharedPreferencesTest`:
+
+```kotlin
+    @Test
+    fun `string sets round-trip`() {
+        val prefs = context.getSharedPreferences("FirebaseHeartBeatW0RFRkFVTFRd", 0)
+        prefs.edit().putStringSet("fire-core/20.4.2", setOf("2026-10-07")).commit()
+
+        assertEquals(setOf("2026-10-07"), prefs.getStringSet("fire-core/20.4.2", null))
+        assertEquals(setOf("default"), prefs.getStringSet("missing", setOf("default")))
+    }
+
+    @Test
+    fun `getAll returns string sets as sets`() {
+        val prefs = context.getSharedPreferences("FirebaseHeartBeatW0RFRkFVTFRd", 0)
+        prefs.edit()
+            .putString("last-used-date", "2026-10-07")
+            .putStringSet("fire-core/20.4.2", setOf("2026-10-06", "2026-10-07"))
+            .commit()
+
+        assertEquals(
+            mapOf("last-used-date" to "2026-10-07", "fire-core/20.4.2" to setOf("2026-10-06", "2026-10-07")),
+            prefs.all
+        )
+    }
+
+    @Test
+    fun `remove deletes the key`() {
+        val prefs = context.getSharedPreferences("FirebaseHeartBeatW0RFRkFVTFRd", 0)
+        prefs.edit().putStringSet("fire-core/20.4.2", setOf("2026-10-07")).commit()
+        prefs.edit().remove("fire-core/20.4.2").commit()
+
+        assertFalse(prefs.contains("fire-core/20.4.2"))
+        assertTrue(prefs.all.isEmpty())
+    }
+```
+
+In `other preference files still reject unknown keys`, change the file name to `"com.google.firebase.common.prefs:W0RFRkFVTFRd"` (heartbeat files are now platform-backed) and add:
+
+```kotlin
+        assertThrows(IllegalArgumentException::class.java) { prefs.getStringSet("unknown", null) }
+        assertThrows(IllegalArgumentException::class.java) { prefs.edit().putStringSet("unknown", null) }
+        assertThrows(IllegalArgumentException::class.java) { prefs.edit().remove("unknown") }
+```
+
+Create `src/test/kotlin/HeartBeatTest.kt`:
+
+```kotlin
+/*
+ * Tests that Firebase's heartbeat reporting (firebase-common), which Installations attaches to
+ * its requests, can store and read heartbeats through the platform-backed preferences.
+ */
+import com.google.firebase.heartbeatinfo.DefaultHeartBeatController
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class HeartBeatTest : FirebaseTest() {
+
+    @Test
+    fun `registered heartbeat is reported in the header`(): Unit = runTest {
+        val controller = app.get(DefaultHeartBeatController::class.java)
+
+        controller.registerHeartBeat().await()
+
+        assertTrue(controller.heartBeatsHeader.await().isNotEmpty())
+    }
+}
+```
+
+- [ ] **Step 2: Run the tests and confirm they fail**
+
+Run: `JAVA_HOME=~/.sdkman/candidates/java/17.0.14-jbr ./gradlew test --tests 'PlatformSharedPreferencesTest' --tests 'HeartBeatTest'`
+Expected: test compilation fails with unresolved `putStringSet`, `getStringSet`, and `remove`.
+
+- [ ] **Step 3: Extend the interface**
+
+In `SharedPreferences.java`, change `Map<String, String> getAll();` to `Map<String, ?> getAll();`, add `Set<String> getStringSet(String key, Set<String> defValues);` (import `java.util.Set`), and in `Editor` add `Editor putStringSet(String key, Set<String> values);` and `Editor remove(String key);`.
+
+- [ ] **Step 4: Strict preferences reject the new methods**
+
+In `Context.kt`'s anonymous `SharedPreferences`, add `getStringSet` throwing `IllegalArgumentException(key)`; in its `Editor`, add `putStringSet` and `remove` throwing `IllegalArgumentException(key)`.
+
+- [ ] **Step 5: String sets in `PlatformSharedPreferences`**
+
+Replace the key set with an index mapping each key to whether its value is a string set; store string sets JSON-encoded; `getAll()` decodes them; `putStringSet(key, null)` and `remove(key)` delete the key. Update the header comment to describe the index. Route names starting with `FirebaseHeartBeat` to `PlatformSharedPreferences` in `Context.getSharedPreferences`.
+
+- [ ] **Step 6: Run the tests and confirm they pass**
+
+Run: `JAVA_HOME=~/.sdkman/candidates/java/17.0.14-jbr ./gradlew test --tests 'PlatformSharedPreferencesTest' --tests 'ContextFilesTest' --tests 'HeartBeatTest' --tests 'FirebaseRemoteConfigTest' ktlintCheck`
+Expected: all pass (2 skipped); ktlint clean.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/main/java/android/content/SharedPreferences.java src/main/java/android/content/PlatformSharedPreferences.kt src/main/java/android/content/Context.kt src/test/kotlin/PlatformSharedPreferencesTest.kt src/test/kotlin/HeartBeatTest.kt
+git commit -m "Persist Firebase heartbeat preferences through FirebasePlatform"
+```
+
+---
+
+### Task 8: Capture and assert expected Remote Config warnings
+
+Added during execution (spec: "Changes agreed during implementation", item 2). Runs after Task 7, before Task 6.
+
+**Files:**
+- Modify: `src/test/kotlin/FirebaseTest.kt`
+- Modify: `src/test/kotlin/FirebaseRemoteConfigTest.kt`
+
+**Interfaces:**
+- Produces: `FirebaseTest.log(message: String)`, `protected open`, default `println(message)`; the test platform's `log` delegates to it.
+
+- [ ] **Step 1: Write the failing test**
+
+In `FirebaseRemoteConfigTest`, add a synchronized `logs` list, override `log` to append to it, and extend `fetchAndActivate succeeds` to assert that every captured log starts with one of: `FirebaseApp Device unlocked`, `FirebaseRemoteConfig No such package: app.teamhub.TeamHub`, `ContentValues No such package: app.teamhub.TeamHub` (Installations, fresh installs only), `FirebaseRemoteConfig Could not update ABT experiments.`; and that the Remote Config `No such package` and ABT messages each appear.
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `JAVA_HOME=~/.sdkman/candidates/java/17.0.14-jbr ./gradlew test --tests 'FirebaseRemoteConfigTest'`
+Expected: test compilation fails: `log` overrides nothing.
+
+- [ ] **Step 3: Add the hook to `FirebaseTest`**
+
+Add `protected open fun log(message: String) = println(message)` and make the platform's `log(msg)` call `this@FirebaseTest.log(msg)`.
+
+- [ ] **Step 4: Run it and confirm it passes with clean output**
+
+Run: same as Step 2, plus `ktlintCheck`.
+Expected: 7 pass, 2 skipped; the `<system-out>` of `TEST-FirebaseRemoteConfigTest.xml` is empty.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/test/kotlin/FirebaseTest.kt src/test/kotlin/FirebaseRemoteConfigTest.kt
+git commit -m "Capture and assert expected Remote Config warnings in tests"
+```

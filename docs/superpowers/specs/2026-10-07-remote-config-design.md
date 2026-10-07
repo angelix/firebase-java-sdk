@@ -150,3 +150,24 @@ JDK 25 version string. The full suite must pass with clean output.
 Publishing `test_remote_string` would let the two ignored fetch tests run. A
 fixture could do this with the Admin SDK, but it needs service-account
 credentials in the test environment, so it stays out of this work.
+
+## Changes agreed during implementation
+
+The live fetch test surfaced two issues the bytecode scan missed. Angelos
+decided both on 2026-10-07:
+
+1. **Heartbeat storage.** `firebase-common`'s `HeartBeatInfoStorage` uses
+   `getStringSet`, `putStringSet`, `remove`, and `getAll` (checking values with
+   `instanceof Set`) on the `FirebaseHeartBeat<persistenceKey>` preference
+   file. The strict whitelist supports none of these, so heartbeats failed for
+   every product; Installations logged "Failed to get heartbeats header". These
+   files become platform-backed too. `PlatformSharedPreferences` gains string
+   sets and `remove`, and its key index records which keys hold string sets so
+   `getAll()` returns them as `Set<String>`. `SharedPreferences.getAll()` takes
+   Android's `Map<String, ?>` signature.
+2. **Expected warnings in test output.** Each fetch logs a
+   `NameNotFoundException` (from `getPackageInfo`), and each activate logs
+   `AbtException: The Analytics SDK is not available`. Both are expected on the
+   JVM. `FirebaseTest` routes platform logs through an overridable `log`, and
+   `FirebaseRemoteConfigTest` captures them and asserts the live fetch logs
+   exactly these expected messages.
