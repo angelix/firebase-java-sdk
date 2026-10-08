@@ -70,6 +70,24 @@ class PreferencesFileTest {
     }
 
     @Test
+    fun `a written file is read back with its types`() {
+        prefs("written").edit()
+            .putString("string", "abc")
+            .putInt("int", -1)
+            .putLong("long", 42L)
+            .putBoolean("boolean", true)
+            .putStringSet("stringSet", setOf("x", "y"))
+            .commit()
+        // A copy is read by a new instance, as after a restart, not from the writer's memory
+        file("written").copyTo(file("copy"))
+
+        assertEquals(
+            mapOf("string" to "abc", "int" to -1, "long" to 42L, "boolean" to true, "stringSet" to setOf("x", "y")),
+            prefs("copy").all
+        )
+    }
+
+    @Test
     fun `missing keys return defaults`() {
         val prefs = prefs()
 
