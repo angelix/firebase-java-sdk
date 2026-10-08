@@ -37,6 +37,9 @@ open class Context {
     val isDeviceProtectedStorage: Boolean
         get() = false
 
+    // The JVM has no separate device-protected storage, so this context already is it
+    fun createDeviceProtectedStorageContext(): Context = this
+
     val noBackupFilesDir: File
         get() = File(System.getProperty("java.io.tmpdir"))
 

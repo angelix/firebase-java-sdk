@@ -4,6 +4,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.FirebasePlatform
 import com.google.firebase.initialize
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -45,6 +46,19 @@ class FirebaseAppTest : FirebaseTest() {
                 .setGcmSenderId("341458593155")
                 .build()
         Firebase.initialize(Application(), options)
+    }
+
+    @Test
+    fun `data collection default can be changed`() {
+        // The Boolean? overload; the boolean one is deprecated
+        val enabled: Boolean? = true
+        val disabled: Boolean? = false
+
+        app.setDataCollectionDefaultEnabled(enabled)
+        assertTrue(app.isDataCollectionDefaultEnabled)
+
+        app.setDataCollectionDefaultEnabled(disabled)
+        assertFalse(app.isDataCollectionDefaultEnabled)
     }
 
     @Test
