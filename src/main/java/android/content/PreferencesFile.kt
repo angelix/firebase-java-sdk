@@ -33,6 +33,9 @@ internal class PreferencesFile private constructor(private val file: File) : Sha
     // Loaded from the file on first use; read and replaced only while holding this instance's lock
     private var loadedValues: Map<String, Any>? = null
 
+    // The values the file last held, which differ from loadedValues after a failed write
+    private var storedValues: Map<String, Any> = emptyMap()
+
     override fun contains(key: String): Boolean = values().containsKey(key)
 
     override fun getString(key: String, defaultValue: String?): String? = values()[key] as String? ?: defaultValue
@@ -53,7 +56,10 @@ internal class PreferencesFile private constructor(private val file: File) : Sha
     override fun edit(): SharedPreferences.Editor = Edit()
 
     private fun values(): Map<String, Any> = synchronized(this) {
-        loadedValues ?: read().also { loadedValues = it }
+        loadedValues ?: read().also {
+            loadedValues = it
+            storedValues = it
+        }
     }
 
     private fun read(): Map<String, Any> {
@@ -71,15 +77,17 @@ internal class PreferencesFile private constructor(private val file: File) : Sha
         synchronized(this) {
             val updated = if (clear) mutableMapOf() else values().toMutableMap()
             changes.forEach { (key, value) -> if (value == null) updated.remove(key) else updated[key] = value }
-            if (updated == values()) return true
             // As on Android, memory is updated first, so the new values stay readable if the write fails
             loadedValues = updated
+            // A missing file reads as empty, so it only needs writing when it would hold values
+            if (updated == storedValues && (updated.isEmpty() || file.exists())) return true
             try {
                 write(updated)
             } catch (e: IOException) {
                 Log.e(TAG, "Failed to write preferences file $file", e)
                 return false
             }
+            storedValues = updated
             return true
         }
     }

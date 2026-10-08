@@ -12,7 +12,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -33,9 +32,14 @@ class PreferencesFileTest {
 
     private fun prefs(name: String = "frc_app_firebase_settings") = PreferencesFile.at(file(name))
 
-    private fun canCreateFileIn(folder: File): Boolean {
-        val probe = File(folder, "probe")
-        return runCatching { probe.createNewFile() }.getOrDefault(false).also { created -> if (created) probe.delete() }
+    // A non-empty folder in place of the file makes every write fail, on every OS and for every user
+    private fun blockWrites(name: String) {
+        file(name).delete()
+        File(file(name), "blocker").apply { parentFile.mkdirs() }.createNewFile()
+    }
+
+    private fun unblockWrites(name: String) {
+        file(name).deleteRecursively()
     }
 
     @Before
@@ -183,18 +187,35 @@ class PreferencesFileTest {
     fun `failed commit keeps the new values in memory and returns false`() {
         val prefs = prefs()
         prefs.edit().putString("key", "before").commit()
-        val sharedPrefs = file("frc_app_firebase_settings").parentFile
-        sharedPrefs.setWritable(false)
-        try {
-            // Root, and Windows, can still create files in a folder marked read-only
-            assumeFalse("folder is still writable", canCreateFileIn(sharedPrefs))
-            assertFalse(prefs.edit().putString("key", "after").commit())
-            // As on Android, memory is updated even when the file cannot be written
-            assertEquals("after", prefs.getString("key", null))
-            assertTrue(platform.logs.any { it.startsWith("PreferencesFile Failed to write preferences file") })
-        } finally {
-            sharedPrefs.setWritable(true)
-        }
+        blockWrites("frc_app_firebase_settings")
+
+        assertFalse(prefs.edit().putString("key", "after").commit())
+        // As on Android, memory is updated even when the file cannot be written
+        assertEquals("after", prefs.getString("key", null))
+        assertTrue(platform.logs.any { it.startsWith("PreferencesFile Failed to write preferences file") })
+    }
+
+    @Test
+    fun `commit after a failed write writes the values`() {
+        val prefs = prefs()
+        blockWrites("frc_app_firebase_settings")
+        assertFalse(prefs.edit().putString("key", "after").commit())
+        unblockWrites("frc_app_firebase_settings")
+
+        assertTrue(prefs.edit().putString("key", "after").commit())
+
+        assertEquals(setOf("key"), Json.parseToJsonElement(file("frc_app_firebase_settings").readText()).jsonObject.keys)
+    }
+
+    @Test
+    fun `commit recreates a deleted file even when values are unchanged`() {
+        val prefs = prefs()
+        prefs.edit().putString("key", "value").commit()
+        file("frc_app_firebase_settings").delete()
+
+        prefs.edit().putString("key", "value").commit()
+
+        assertTrue(file("frc_app_firebase_settings").exists())
     }
 
     @Test
