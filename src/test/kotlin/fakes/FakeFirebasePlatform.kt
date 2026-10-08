@@ -19,8 +19,16 @@ class FakeFirebasePlatform(
 
     private val filesFolder = File(filesFolderPath)
 
-    // Captured instead of printed, so tests can assert on expected log output
+    // Captured so tests can assert on expected log output
     val logs: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+    // Removes the logged lines starting with [prefix] and returns how many there were, so a test can check
+    // its expected lines and then that nothing else was logged
+    fun takeLogs(prefix: String): Int = synchronized(logs) {
+        val taken = logs.filter { it.startsWith(prefix) }
+        logs.removeAll(taken)
+        taken.size
+    }
 
     override fun store(key: String, value: String) { storage[key] = value }
 

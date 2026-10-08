@@ -7,6 +7,7 @@ import com.google.firebase.FirebasePlatform
 import fakes.FakeFirebasePlatform
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -45,6 +46,11 @@ class PreferencesFileTest {
     @Before
     fun setUp() {
         FirebasePlatform.initializeFirebasePlatform(platform)
+    }
+
+    @After
+    fun nothingUnexpectedWasLogged() {
+        assertEquals(emptyList<String>(), platform.logs.toList())
     }
 
     @Test
@@ -196,7 +202,7 @@ class PreferencesFileTest {
         val prefs = prefs("corrupt")
 
         assertTrue(prefs.all.isEmpty())
-        assertTrue(platform.logs.any { it.startsWith("PreferencesFile Ignoring unreadable preferences file") })
+        assertEquals(1, platform.takeLogs("PreferencesFile Ignoring unreadable preferences file"))
         prefs.edit().putString("key", "value").commit()
         assertEquals(setOf("key"), Json.parseToJsonElement(file("corrupt").readText()).jsonObject.keys)
     }
@@ -210,14 +216,16 @@ class PreferencesFileTest {
         assertFalse(prefs.edit().putString("key", "after").commit())
         // As on Android, memory is updated even when the file cannot be written
         assertEquals("after", prefs.getString("key", null))
-        assertTrue(platform.logs.any { it.startsWith("PreferencesFile Failed to write preferences file") })
+        assertEquals(1, platform.takeLogs("PreferencesFile Failed to write preferences file"))
     }
 
     @Test
     fun `commit after a failed write writes the values`() {
         val prefs = prefs()
+        prefs.edit().putString("key", "before").commit()
         blockWrites("frc_app_firebase_settings")
         assertFalse(prefs.edit().putString("key", "after").commit())
+        assertEquals(1, platform.takeLogs("PreferencesFile Failed to write preferences file"))
         unblockWrites("frc_app_firebase_settings")
 
         assertTrue(prefs.edit().putString("key", "after").commit())

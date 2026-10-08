@@ -6,6 +6,7 @@ import android.app.Application
 import android.content.Context
 import com.google.firebase.FirebasePlatform
 import fakes.FakeFirebasePlatform
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -24,12 +25,20 @@ class ContextFilesTest {
 
     private lateinit var filesDir: File
 
+    private lateinit var platform: FakeFirebasePlatform
+
     private val context = Application()
 
     @Before
     fun setUp() {
         filesDir = File(folder.root, "files")
-        FirebasePlatform.initializeFirebasePlatform(FakeFirebasePlatform(filesFolderPath = filesDir.path))
+        platform = FakeFirebasePlatform(filesFolderPath = filesDir.path)
+        FirebasePlatform.initializeFirebasePlatform(platform)
+    }
+
+    @After
+    fun nothingUnexpectedWasLogged() {
+        assertEquals(emptyList<String>(), platform.logs.toList())
     }
 
     @Test
@@ -91,7 +100,8 @@ class ContextFilesTest {
     @Test
     fun `getDatabasePath creates its folder`() {
         val databases = File(folder.root, "databases")
-        FirebasePlatform.initializeFirebasePlatform(FakeFirebasePlatform(databaseFolderPath = databases.path))
+        platform = FakeFirebasePlatform(databaseFolderPath = databases.path)
+        FirebasePlatform.initializeFirebasePlatform(platform)
 
         assertEquals(File(databases, "firestore.db"), context.getDatabasePath("firestore.db"))
         assertTrue(databases.isDirectory)
