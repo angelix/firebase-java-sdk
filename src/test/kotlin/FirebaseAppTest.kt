@@ -29,10 +29,10 @@ class FirebaseAppTest : FirebaseTest() {
 
                 override fun log(msg: String) = println(msg)
 
-                // Keeps Firebase's data in this test's temporary folder
-                override fun getDatabasePath(name: String) = File(folder.root, name)
+                // Keeps Firebase's data in this test's folder
+                override fun getDatabasePath(name: String) = File(dataFolder, name)
 
-                override fun getFilesDir() = File(folder.root, "files")
+                override fun getFilesDir() = File(dataFolder, "files")
             }
         )
         val options =

@@ -6,9 +6,8 @@ import com.google.firebase.FirebasePlatform
 import com.google.firebase.initialize
 import org.junit.After
 import org.junit.Before
-import org.junit.Rule
-import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 abstract class FirebaseTest {
@@ -28,9 +27,9 @@ abstract class FirebaseTest {
         Firebase.initialize(Application(), options)
     }
 
-    // Preferences and config files are written under getFilesDir(), so each test gets its own
-    @get:Rule
-    val folder = TemporaryFolder()
+    // Each test gets its own folder for Firebase's files and databases. It is kept until the next test run, so
+    // background work that outlives a test writes into this folder instead of failing into a later test.
+    protected val dataFolder = File("build/test-data/${UUID.randomUUID()}")
 
     protected open fun log(message: String) = println(message)
 
@@ -53,9 +52,9 @@ abstract class FirebaseTest {
 
                 override fun log(msg: String) = this@FirebaseTest.log(msg)
 
-                override fun getDatabasePath(name: String) = File("./build/$name")
+                override fun getDatabasePath(name: String) = File(dataFolder, name)
 
-                override fun getFilesDir() = File(folder.root, "files")
+                override fun getFilesDir() = File(dataFolder, "files")
             }
         )
     }
