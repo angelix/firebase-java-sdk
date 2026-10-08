@@ -13,18 +13,18 @@ import java.util.concurrent.ConcurrentHashMap
 
 abstract class FirebaseTest {
 
-    protected val app: FirebaseApp by lazy {
-        val options =
-            FirebaseOptions
-                .Builder()
-                .setProjectId("fir-java-sdk")
-                .setApplicationId("1:341458593155:web:bf8e1aa37efe01f32d42b6")
-                .setApiKey("AIzaSyCvVHjTJHyeStnzIE7J9LLtHqWk6reGM08")
-                .setDatabaseUrl("https://fir-java-sdk-default-rtdb.firebaseio.com")
-                .setStorageBucket("fir-java-sdk.appspot.com")
-                .setGcmSenderId("341458593155")
-                .build()
+    protected val options: FirebaseOptions =
+        FirebaseOptions
+            .Builder()
+            .setProjectId("fir-java-sdk")
+            .setApplicationId("1:341458593155:web:bf8e1aa37efe01f32d42b6")
+            .setApiKey("AIzaSyCvVHjTJHyeStnzIE7J9LLtHqWk6reGM08")
+            .setDatabaseUrl("https://fir-java-sdk-default-rtdb.firebaseio.com")
+            .setStorageBucket("fir-java-sdk.appspot.com")
+            .setGcmSenderId("341458593155")
+            .build()
 
+    protected val app: FirebaseApp by lazy {
         Firebase.initialize(Application(), options)
     }
 

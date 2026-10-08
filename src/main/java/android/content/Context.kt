@@ -1,5 +1,6 @@
 package android.content
 
+import android.app.Application
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.res.Resources
@@ -15,8 +16,11 @@ import java.net.URLEncoder
 
 open class Context {
 
+    // Firebase casts the application context to Application, so a plain Context provides one
     val applicationContext: Context
-        get() = this
+        get() = this as? Application ?: application
+
+    private val application: Application by lazy { Application() }
 
     val mainLooper: Looper
         get() = Looper.getMainLooper()

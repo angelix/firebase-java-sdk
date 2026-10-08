@@ -1,8 +1,10 @@
 import android.app.Application
+import android.content.Context
 import com.google.firebase.Firebase
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.FirebasePlatform
 import com.google.firebase.initialize
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -43,5 +45,12 @@ class FirebaseAppTest : FirebaseTest() {
                 .setGcmSenderId("341458593155")
                 .build()
         Firebase.initialize(Application(), options)
+    }
+
+    @Test
+    fun `initialize firebase with a plain Context`() {
+        val app = Firebase.initialize(Context(), options)
+
+        assertTrue(app.applicationContext is Application)
     }
 }
